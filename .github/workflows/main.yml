@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential git curl wget unzip zip \
+            libbz2-dev build-essential git curl wget unzip zip \
             libssl-dev libcurl4-openssl-dev libzip-dev \
             zlib1g-dev pkg-config python3 python3-pip \
             libplist-dev libimobiledevice-dev
