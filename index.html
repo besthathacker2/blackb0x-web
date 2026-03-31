@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>blackb0x web — ATV3,2 flasher</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 680px; margin: 0 auto; }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 0.25rem;
+  }
+  .subtitle { font-size: 0.8rem; color: #666; margin-bottom: 2rem; }
+
+  .card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Status dots */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+  .dot.red { background: #ef4444; }
+  .dot.amber { background: #f59e0b; box-shadow: 0 0 6px #f59e0b88; }
+  .dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .status-label { font-size: 0.85rem; color: #bbb; }
+
+  /* File upload */
+  .file-zone {
+    border: 1px dashed #333;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 0.75rem;
+  }
+  .file-zone:hover, .file-zone.drag { border-color: #555; background: #161616; }
+  .file-zone.ready { border-color: #22c55e44; background: #22c55e08; }
+  .file-zone-icon { font-size: 1.5rem; margin-bottom: 0.5rem; opacity: 0.4; }
+  .file-zone-label { font-size: 0.8rem; color: #666; }
+  .file-zone.ready .file-zone-label { color: #22c55e; }
+  input[type=file] { display: none; }
+
+  /* File list */
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: 0.8rem;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-name { color: #bbb; flex: 1; font-family: monospace; }
+  .file-size { color: #555; font-family: monospace; }
+  .file-badge {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-ibss { background: #1e3a5f; color: #60a5fa; }
+  .badge-ibec { background: #1e3a2f; color: #4ade80; }
+  .badge-unknown { background: #2a2a2a; color: #888; }
+
+  /* Main button */
+  .btn {
+    width: 100%;
+    padding: 0.875rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.01em;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+  .btn-primary { background: #fff; color: #000; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-sm {
+    width: auto;
+    padding: 0.4rem 0.875rem;
+    font-size: 0.78rem;
+    background: #1a1a1a;
+    color: #bbb;
+    border: 1px solid #333;
+  }
+
+  /* Log */
+  .log {
+    background: #0d0d0d;
+    border: 1px solid #1a1a1a;
+    border-radius: 8px;
+    padding: 0.875rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: #888;
+    min-height: 140px;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .log .ok { color: #22c55e; }
+  .log .warn { color: #f59e0b; }
+  .log .err { color: #ef4444; }
+  .log .info { color: #60a5fa; }
+  .log .dim { color: #444; }
+
+  /* Progress */
+  .progress-wrap { margin: 0.75rem 0; display: none; }
+  .progress-track {
+    height: 3px;
+    background: #1a1a1a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: #fff;
+    border-radius: 2px;
+    transition: width 0.2s;
+    width: 0%;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: #555;
+    margin-top: 5px;
+  }
+
+  /* Steps */
+  .steps { display: flex; gap: 0; margin-bottom: 1.25rem; }
+  .step {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.7rem;
+    color: #333;
+    border-bottom: 2px solid #1a1a1a;
+    transition: color 0.3s, border-color 0.3s;
+  }
+  .step.active { color: #fff; border-color: #fff; }
+  .step.done { color: #22c55e; border-color: #22c55e; }
+
+  .hint { font-size: 0.75rem; color: #444; margin-top: 0.5rem; line-height: 1.5; }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .sep { border: none; border-top: 1px solid #1a1a1a; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>blackb0x web</h1>
+  <p class="subtitle">Apple TV 3,2 (A1469) · WebUSB flasher · untethered jailbreak</p>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step-0">1. load files</div>
+    <div class="step" id="step-1">2. connect</div>
+    <div class="step" id="step-2">3. flash</div>
+    <div class="step" id="step-3">4. done</div>
+  </div>
+
+  <!-- WebUSB check -->
+  <div class="card">
+    <div class="card-title">browser compatibility</div>
+    <div class="status-row">
+      <div class="dot" id="dot-webusb"></div>
+      <span class="status-label" id="label-webusb">checking WebUSB support...</span>
+    </div>
+  </div>
+
+  <!-- File loader -->
+  <div class="card">
+    <div class="card-title">patched firmware files</div>
+    <p class="hint" style="margin-bottom:0.75rem;">
+      Download the artifact zip from your
+      <a href="https://github.com" target="_blank">GitHub Actions run</a>,
+      then drop the zip (or individual .dfu files) here.
+    </p>
+
+    <div class="file-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="file-zone-icon">⬆</div>
+      <div class="file-zone-label" id="drop-label">drop zip or .dfu files here · or click to browse</div>
+    </div>
+    <input type="file" id="file-input" multiple accept=".zip,.dfu">
+
+    <div id="file-list"></div>
+  </div>
+
+  <!-- Device connect -->
+  <div class="card">
+    <div class="card-title">apple tv connection</div>
+    <div class="status-row" style="margin-bottom:0.875rem;">
+      <div class="dot amber pulse" id="dot-device"></div>
+      <span class="status-label" id="label-device">waiting for device...</span>
+    </div>
+    <p class="hint" style="margin-bottom:0.875rem;">
+      Hold <strong>Menu + Down</strong> for 6–7 seconds until the amber light pulses rapidly. Then connect via micro-USB.
+    </p>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" onclick="connectDevice()">connect</button>
+      <button class="btn btn-sm" onclick="disconnectDevice()" id="btn-disconnect" style="display:none;">disconnect</button>
+    </div>
+  </div>
+
+  <!-- Flash -->
+  <div class="card">
+    <div class="card-title">flash</div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-label">
+        <span id="progress-step-label">—</span>
+        <span id="progress-pct">0%</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-flash" onclick="startFlash()" disabled>
+      install jailbreak
+    </button>
+    <button class="btn btn-danger" id="btn-abort" onclick="abortFlash()" style="display:none;margin-top:8px;">
+      abort
+    </button>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>log</span>
+      <button class="btn btn-sm" onclick="clearLog()" style="padding:2px 8px;font-size:0.65rem;">clear</button>
+    </div>
+    <div class="log" id="log">ready. load your patched firmware files to begin.
+</div>
+  </div>
+
+  <p class="hint" style="text-align:center;margin-top:1rem;">
+    make sure your apple tv has internet on first boot · wait 5–10 min for kodi to appear
+  </p>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  files: {},    // { ibss: ArrayBuffer, ibec: ArrayBuffer }
+  device: null,
+  aborting: false,
+};
+
+const APPLE_VENDOR = 0x05AC;
+const DFU_PIDS = [0x1281, 0x1286, 0x1287, 0x1290, 0x1297];
+const RECOVERY_PIDS = [0x1281, 0x1286, 0x1287, 0x1290, 0x1291, 0x1292, 0x1293, 0x1294];
+const DFU_CHUNK = 0x800;       // 2KB chunks for DFU mode
+const RECOVERY_CHUNK = 0x8000; // 32KB chunks for recovery mode
+const USB_TIMEOUT = 10000;
+// DFU magic trailer appended after last data chunk
+const DFU_TRAILER = new Uint8Array([0xff,0xff,0xff,0xff,0xac,0x05,0x00,0x01,0x55,0x46,0x44,0x10]);
+
+// ─── Logging ─────────────────────────────────────────────────────────────────
+function log(msg, cls = '') {
+  const el = document.getElementById('log');
+  const line = document.createElement('span');
+  if (cls) line.className = cls;
+  line.textContent = msg + '\n';
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+}
+
+// ─── Steps ───────────────────────────────────────────────────────────────────
+function setStep(n) {
+  for (let i = 0; i <= 3; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (i < n) el.className = 'step done';
+    else if (i === n) el.className = 'step active';
+    else el.className = 'step';
+  }
+}
+
+// ─── Progress ────────────────────────────────────────────────────────────────
+function setProgress(pct, label) {
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = Math.round(pct) + '%';
+  document.getElementById('progress-step-label').textContent = label;
+}
+
+// ─── WebUSB check ────────────────────────────────────────────────────────────
+window.onload = () => {
+  const dot = document.getElementById('dot-webusb');
+  const label = document.getElementById('label-webusb');
+  if (navigator.usb) {
+    dot.className = 'dot green';
+    label.textContent = 'WebUSB available — Chrome/Chromium detected';
+  } else {
+    dot.className = 'dot red';
+    label.textContent = 'WebUSB not available — please use Chrome or Chromium';
+    document.getElementById('btn-flash').disabled = true;
+  }
+};
+
+// ─── File loading ─────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  handleFiles(e.target.files);
+});
+
+async function handleFiles(files) {
+  for (const file of files) {
+    if (file.name.endsWith('.zip')) {
+      await loadZip(file);
+    } else if (file.name.endsWith('.dfu')) {
+      await loadDfu(file);
+    } else if (file.name === 'manifest.json') {
+      // ignore
+    } else {
+      log(`skipped: ${file.name} (not .zip or .dfu)`, 'warn');
+    }
+  }
+  updateFileUI();
+}
+
+async function loadZip(file) {
+  log(`loading zip: ${file.name}`, 'info');
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+
+  // Simple ZIP parser - find local file headers (PK\x03\x04)
+  let i = 0;
+  let found = 0;
+  while (i < bytes.length - 4) {
+    if (bytes[i] === 0x50 && bytes[i+1] === 0x4b && bytes[i+2] === 0x03 && bytes[i+3] === 0x04) {
+      const compression = bytes[i+8] | (bytes[i+9] << 8);
+      const compSize = bytes[i+18] | (bytes[i+19] << 8) | (bytes[i+20] << 16) | (bytes[i+21] << 24);
+      const nameLen = bytes[i+26] | (bytes[i+27] << 8);
+      const extraLen = bytes[i+28] | (bytes[i+29] << 8);
+      const name = new TextDecoder().decode(bytes.slice(i+30, i+30+nameLen));
+      const dataStart = i + 30 + nameLen + extraLen;
+
+      if (name.endsWith('.dfu') && compression === 0) {
+        const data = buf.slice(dataStart, dataStart + compSize);
+        classifyAndStore(name, data);
+        found++;
+      }
+      i = dataStart + compSize;
+    } else {
+      i++;
+    }
+  }
+  if (found === 0) {
+    log(`warning: no uncompressed .dfu files found in zip — try extracting first`, 'warn');
+  } else {
+    log(`extracted ${found} .dfu file(s) from zip`, 'ok');
+  }
+}
+
+async function loadDfu(file) {
+  const buf = await file.arrayBuffer();
+  classifyAndStore(file.name, buf);
+}
+
+function classifyAndStore(name, buf) {
+  const lower = name.toLowerCase();
+  const basename = name.split('/').pop();
+  if (lower.includes('ibss') || lower.includes('pwned') && lower.includes('ss')) {
+    state.files.ibss = buf;
+    log(`  iBSS loaded: ${basename} (${fmt(buf.byteLength)})`, 'ok');
+  } else if (lower.includes('ibec') || lower.includes('pwned') && lower.includes('ec')) {
+    state.files.ibec = buf;
+    log(`  iBEC loaded: ${basename} (${fmt(buf.byteLength)})`, 'ok');
+  } else {
+    log(`  unknown: ${basename} — skipped`, 'dim');
+  }
+}
+
+function fmt(bytes) {
+  return bytes > 1024*1024 ? (bytes/1024/1024).toFixed(1)+'MB' : (bytes/1024).toFixed(0)+'KB';
+}
+
+function updateFileUI() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '';
+  let readyCount = 0;
+
+  const items = [
+    { key: 'ibss', label: 'iBSS', badge: 'badge-ibss', required: true },
+    { key: 'ibec', label: 'iBEC', badge: 'badge-ibec', required: true },
+  ];
+
+  for (const item of items) {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+    const buf = state.files[item.key];
+    if (buf) {
+      el.innerHTML = `
+        <span class="dot green"></span>
+        <span class="file-badge ${item.badge}">${item.label}</span>
+        <span class="file-name">${item.key === 'ibss' ? 'pwnediBSS.dfu' : 'pwnediBEC.dfu'}</span>
+        <span class="file-size">${fmt(buf.byteLength)}</span>
+      `;
+      readyCount++;
+    } else {
+      el.innerHTML = `
+        <span class="dot"></span>
+        <span class="file-badge badge-unknown">${item.label}</span>
+        <span class="file-name" style="color:#444;">not loaded</span>
+        <span class="file-size" style="color:#333;">required</span>
+      `;
+    }
+    list.appendChild(el);
+  }
+
+  const zone = document.getElementById('drop-zone');
+  const dropLabel = document.getElementById('drop-label');
+  if (readyCount === 2) {
+    zone.classList.add('ready');
+    dropLabel.textContent = 'both files loaded — ready to flash';
+    setStep(1);
+  } else {
+    zone.classList.remove('ready');
+    dropLabel.textContent = `${readyCount}/2 files loaded — drop more`;
+  }
+
+  checkFlashReady();
+}
+
+// ─── Device connection ────────────────────────────────────────────────────────
+async function connectDevice() {
+  try {
+    log('opening device picker...', 'info');
+    const filters = DFU_PIDS.map(id => ({ vendorId: APPLE_VENDOR, productId: id }));
+    const device = await navigator.usb.requestDevice({ filters });
+    await device.open();
+
+    const isDFU = DFU_PIDS.includes(device.productId);
+    const isRecovery = RECOVERY_PIDS.includes(device.productId);
+    const mode = isDFU ? 'DFU' : (isRecovery ? 'Recovery' : 'Unknown');
+
+    state.device = device;
+    state.deviceMode = mode;
+
+    document.getElementById('dot-device').className = 'dot green';
+    document.getElementById('label-device').textContent =
+      `${device.manufacturerName || 'Apple'} — PID 0x${device.productId.toString(16)} · mode: ${mode}`;
+    document.getElementById('btn-disconnect').style.display = 'inline-block';
+
+    log(`connected: PID=0x${device.productId.toString(16)} mode=${mode}`, 'ok');
+    log(`serial: ${device.serialNumber || 'n/a'}`, 'dim');
+
+    if (!isDFU) {
+      log('warning: device is not in DFU mode. Enter DFU: hold Menu+Down 6-7s', 'warn');
+    }
+
+    setStep(2);
+    checkFlashReady();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      log(`connect error: ${e.message}`, 'err');
+    } else {
+      log('device picker cancelled', 'dim');
+    }
+  }
+}
+
+async function disconnectDevice() {
+  if (state.device) {
+    try { await state.device.close(); } catch(_) {}
+    state.device = null;
+  }
+  document.getElementById('dot-device').className = 'dot amber pulse';
+  document.getElementById('label-device').textContent = 'disconnected';
+  document.getElementById('btn-disconnect').style.display = 'none';
+  checkFlashReady();
+}
+
+function checkFlashReady() {
+  const ready = state.files.ibss && state.files.ibec && state.device;
+  document.getElementById('btn-flash').disabled = !ready;
+}
+
+// ─── DFU protocol ─────────────────────────────────────────────────────────────
+// Apple uses USB DFU class protocol:
+// bmRequestType=0x21 bRequest=1 (DNLOAD) for sending chunks
+// bmRequestType=0xA1 bRequest=3 (GETSTATUS) to poll
+async function dfuGetStatus(device) {
+  const result = await device.controlTransferIn({
+    requestType: 'class',
+    recipient: 'interface',
+    request: 3,   // DFU_GETSTATUS
+    value: 0,
+    index: 0,
+  }, 6);
+  return result.data;
+}
+
+async function dfuSendChunk(device, blockNum, data) {
+  await device.controlTransferOut({
+    requestType: 'class',
+    recipient: 'interface',
+    request: 1,   // DFU_DNLOAD
+    value: blockNum,
+    index: 0,
+  }, data);
+}
+
+async function dfuClaimInterface(device) {
+  try {
+    await device.selectConfiguration(1);
+  } catch(_) {}
+  await device.claimInterface(0);
+}
+
+async function sendFileViaDFU(device, buffer, label) {
+  const data = new Uint8Array(buffer);
+  const totalSize = data.length + DFU_TRAILER.length;
+  let sent = 0;
+  let blockNum = 0;
+
+  log(`sending ${label} (${fmt(buffer.byteLength)}) via DFU...`, 'info');
+
+  while (sent < data.length) {
+    if (state.aborting) throw new Error('aborted');
+
+    const chunkSize = Math.min(DFU_CHUNK, data.length - sent);
+    const chunk = data.slice(sent, sent + chunkSize);
+    await dfuSendChunk(device, blockNum, chunk);
+    sent += chunkSize;
+    blockNum++;
+
+    const pct = (sent / totalSize) * 100;
+    setProgress(pct, label);
+
+    // Poll status every 16 blocks
+    if (blockNum % 16 === 0) {
+      try { await dfuGetStatus(device); } catch(_) {}
+    }
+  }
+
+  // Send the DFU magic trailer as final block
+  log('sending DFU trailer...', 'dim');
+  await dfuSendChunk(device, blockNum, DFU_TRAILER);
+  blockNum++;
+
+  // Final empty download to signal completion
+  try {
+    await dfuSendChunk(device, blockNum, new Uint8Array(0));
+  } catch(_) {}
+
+  setProgress(100, label + ' — done');
+  log(`${label} sent (${blockNum} blocks)`, 'ok');
+}
+
+// Recovery mode: send via bulk transfer to endpoint 0x04
+async function sendFileViaRecovery(device, buffer, label) {
+  const data = new Uint8Array(buffer);
+  let sent = 0;
+  log(`sending ${label} (${fmt(buffer.byteLength)}) via recovery bulk...`, 'info');
+
+  // Claim bulk interface (interface 1 for recovery mode on Apple devices)
+  try { await device.claimInterface(1); } catch(_) {
+    try { await device.claimInterface(0); } catch(_) {}
+  }
+
+  while (sent < data.length) {
+    if (state.aborting) throw new Error('aborted');
+    const chunkSize = Math.min(RECOVERY_CHUNK, data.length - sent);
+    const chunk = data.slice(sent, sent + chunkSize);
+    await device.transferOut(4, chunk); // endpoint 0x04
+    sent += chunkSize;
+    setProgress((sent / data.length) * 100, label);
+  }
+  log(`${label} sent`, 'ok');
+}
+
+// Send a text command to iBoot in recovery mode
+async function sendCommand(device, cmd) {
+  const encoded = new TextEncoder().encode(cmd + '\0');
+  try {
+    await device.controlTransferOut({
+      requestType: 'class',
+      recipient: 'interface',
+      request: 0,
+      value: 0,
+      index: 0,
+    }, encoded);
+    log(`> ${cmd}`, 'dim');
+  } catch(e) {
+    log(`command failed: ${cmd} — ${e.message}`, 'warn');
+  }
+}
+
+// ─── Main flash sequence ───────────────────────────────────────────────────────
+async function startFlash() {
+  if (!state.files.ibss || !state.files.ibec || !state.device) return;
+
+  state.aborting = false;
+  document.getElementById('btn-flash').style.display = 'none';
+  document.getElementById('btn-abort').style.display = 'block';
+  document.getElementById('progress-wrap').style.display = 'block';
+  setStep(2);
+
+  const device = state.device;
+
+  try {
+    // ── Step 1: Send iBSS in DFU mode ──────────────────────────────────────
+    log('\n── step 1: sending iBSS ──', 'info');
+    await dfuClaimInterface(device);
+    await sendFileViaDFU(device, state.files.ibss, 'iBSS');
+
+    // Device will reconnect in recovery mode after receiving iBSS
+    // Wait for it to re-enumerate
+    log('waiting for device to reboot into iBSS...', 'dim');
+    await sleep(3000);
+
+    // Release and close to allow re-enumeration
+    try { await device.releaseInterface(0); } catch(_) {}
+    try { await device.close(); } catch(_) {}
+
+    log('reconnecting for iBEC send...', 'info');
+    await sleep(2000);
+
+    // Re-open device (it's now in recovery/iBSS mode)
+    try {
+      await device.open();
+      log(`reconnected: PID=0x${device.productId.toString(16)}`, 'ok');
+    } catch(e) {
+      log('device reconnect failed — try clicking connect again after device reboots', 'warn');
+      log(`error: ${e.message}`, 'err');
+      throw e;
+    }
+
+    // ── Step 2: Send iBEC ──────────────────────────────────────────────────
+    log('\n── step 2: sending iBEC ──', 'info');
+    try { await device.selectConfiguration(1); } catch(_) {}
+    await device.claimInterface(0);
+    await sendFileViaDFU(device, state.files.ibec, 'iBEC');
+
+    log('waiting for iBEC to boot...', 'dim');
+    await sleep(4000);
+
+    // ── Step 3: Boot command ───────────────────────────────────────────────
+    log('\n── step 3: sending boot command ──', 'info');
+    try {
+      await sendCommand(device, 'bootx');
+    } catch(_) {
+      try {
+        await sendCommand(device, 'fsboot');
+      } catch(_) {}
+    }
+
+    // ── Done ───────────────────────────────────────────────────────────────
+    log('\n✓ flash complete!', 'ok');
+    log('disconnect USB cable now — do NOT keep it plugged in', 'warn');
+    log('connect apple tv to your TV and wait 5–10 min for kodi to appear', 'ok');
+    log('make sure apple tv has wifi/ethernet during first boot', 'ok');
+    setStep(3);
+    setProgress(100, 'complete');
+
+  } catch(e) {
+    if (state.aborting) {
+      log('\naborted.', 'warn');
+    } else {
+      log(`\nerror: ${e.message}`, 'err');
+      log('check that device is still in DFU mode and try again', 'warn');
+    }
+  } finally {
+    document.getElementById('btn-flash').style.display = 'block';
+    document.getElementById('btn-flash').disabled = false;
+    document.getElementById('btn-abort').style.display = 'none';
+  }
+}
+
+function abortFlash() {
+  state.aborting = true;
+  log('aborting...', 'warn');
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+</script>
+</body>
+</html>
